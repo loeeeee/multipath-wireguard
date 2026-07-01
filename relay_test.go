@@ -170,6 +170,41 @@ func TestRouteTableUpsert(t *testing.T) {
 	}
 }
 
+func TestCounterRecordTxDoesNotUpdateLastSeen(t *testing.T) {
+	var c counter
+
+	before := c.lastSeen.Load()
+	if before != 0 {
+		t.Fatal("initial lastSeen should be zero")
+	}
+
+	c.recordTx(100)
+
+	after := c.lastSeen.Load()
+	if after != before {
+		t.Fatal("recordTx should NOT update lastSeen")
+	}
+
+	c.recordRx(50)
+	if c.lastSeen.Load() == 0 {
+		t.Fatal("recordRx SHOULD update lastSeen")
+	}
+}
+
+func TestCounterSnapshotAfterReset(t *testing.T) {
+	var c counter
+	c.recordRx(100)
+	c.recordTx(200)
+
+	// snapshot returns values without resetting
+	rxPkts1, rxBytes1, txPkts1, txBytes1, _ := c.snapshot()
+	rxPkts2, rxBytes2, txPkts2, txBytes2, _ := c.snapshot()
+
+	if rxPkts1 != rxPkts2 || rxBytes1 != rxBytes2 || txPkts1 != txPkts2 || txBytes1 != txBytes2 {
+		t.Fatal("snapshot should be idempotent")
+	}
+}
+
 func TestRouteTablePrune(t *testing.T) {
 	rt := newRouteTable()
 
